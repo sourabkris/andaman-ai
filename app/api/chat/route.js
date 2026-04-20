@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getTravelModel } from "@/lib/gemini";
 
 export const maxDuration = 60; // Increase timeout for long-running Gemini calls
+export const runtime = 'nodejs';
+
+// Simple in-memory rate limiting (IP -> { count, resetTime })
+const ipRateLimit = new Map();
 
 /**
  * Handle POST request for generating travel itineraries.
@@ -9,6 +13,26 @@ export const maxDuration = 60; // Increase timeout for long-running Gemini calls
  */
 export async function POST(req) {
   try {
+    // Security: Simple rate limiting based on IP or fallback header
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    const now = Date.now();
+    
+    if (ip !== 'unknown') {
+      const windowMs = 60 * 1000; // 1 minute
+      const maxRequests = 10;
+      
+      const record = ipRateLimit.get(ip);
+      
+      if (record && record.resetTime > now) {
+        if (record.count >= maxRequests) {
+          return NextResponse.json({ error: "Too many requests. Please try again in a minute." }, { status: 429 });
+        }
+        record.count++;
+      } else {
+        ipRateLimit.set(ip, { count: 1, resetTime: now + windowMs });
+      }
+    }
+
     const body = await req.json();
     const { message, history } = body;
 

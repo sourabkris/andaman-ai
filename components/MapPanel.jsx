@@ -3,6 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 
+/**
+ * MapPanel component — renders the Google Maps view of the itinerary.
+ * Plots markers and polylines for each day's places when an itinerary is provided.
+ * Cleans up all map overlays on unmount.
+ *
+ * @param {Object} props
+ * @param {Object|null} props.itinerary - The structured itinerary from Gemini
+ */
 export default function MapPanel({ itinerary }) {
   const mapRef = useRef(null);
   const [map, setMap] = useState(null);
@@ -20,13 +28,13 @@ export default function MapPanel({ itinerary }) {
       try {
         const { Map } = await importLibrary("maps");
         const { PlacesService } = await importLibrary("places");
-        
+
         const newMap = new Map(mapRef.current, {
           center: { lat: 11.6765, lng: 92.7302 }, // Port Blair
           zoom: 9,
           mapId: "ANDAMAN_TRAVEL_MAP",
         });
-        
+
         setMap(newMap);
         setPlacesService(new PlacesService(newMap));
       } catch (err) {
@@ -40,104 +48,109 @@ export default function MapPanel({ itinerary }) {
   useEffect(() => {
     if (!map || !placesService || !itinerary || !itinerary.days) return;
 
+    // Clear existing overlays
     markers.forEach(m => m.setMap(null));
     polylines.forEach(p => p.setMap(null));
 
     const newMarkers = [];
     const newPolylines = [];
-    
-    // Ensure google is available
+
     if (typeof google === 'undefined') return;
 
     const bounds = new google.maps.LatLngBounds();
     const colors = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#9333ea', '#0891b2', '#be123c'];
 
     const processPlaces = async () => {
-       for (const [dayIndex, day] of itinerary.days.entries()) {
-           const color = colors[dayIndex % colors.length];
-           
-           // EFFICIENCY: Process all places in the current day in parallel instead of sequentially
-           const locationPromises = day.places.map(place => {
-               const request = {
-                 query: `${place.name}, ${day.location}, Andaman and Nicobar Islands`,
-                 fields: ['name', 'geometry'],
-               };
-               
-               return new Promise((resolve) => {
-                  placesService.findPlaceFromQuery(request, (results, status) => {
-                     if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]?.geometry) {
-                         resolve({ location: results[0].geometry.location, place });
-                     } else {
-                         const fallbackRequest = { query: `${place.name}, Andaman`, fields: ['geometry'] };
-                         placesService.findPlaceFromQuery(fallbackRequest, (res, st) => {
-                             if (st === google.maps.places.PlacesServiceStatus.OK && res?.[0]?.geometry) {
-                                 resolve({ location: res[0].geometry.location, place });
-                             } else {
-                                 resolve(null);
-                             }
-                         });
-                     }
-                  });
-               });
-           });
+      for (const [dayIndex, day] of itinerary.days.entries()) {
+        const color = colors[dayIndex % colors.length];
 
-           const resolvedLocations = await Promise.all(locationPromises);
-           const dayCoordinates = [];
+        // EFFICIENCY: Resolve all places for this day in parallel
+        const locationPromises = day.places.map(place => {
+          const request = {
+            query: `${place.name}, ${day.location}, Andaman and Nicobar Islands`,
+            fields: ['name', 'geometry'],
+          };
 
-           resolvedLocations.forEach(result => {
-               if (result) {
-                   const { location, place } = result;
-                   dayCoordinates.push(location);
-                   bounds.extend(location);
-                   
-                   const marker = new google.maps.Marker({
-                       map,
-                       position: location,
-                       title: place.name,
-                       icon: {
-                           path: google.maps.SymbolPath.CIRCLE,
-                           scale: 7,
-                           fillColor: color,
-                           fillOpacity: 1,
-                           strokeColor: '#ffffff',
-                           strokeWeight: 2,
-                       }
-                   });
-                   newMarkers.push(marker);
+          return new Promise((resolve) => {
+            placesService.findPlaceFromQuery(request, (results, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]?.geometry) {
+                resolve({ location: results[0].geometry.location, place });
+              } else {
+                const fallbackRequest = { query: `${place.name}, Andaman`, fields: ['geometry'] };
+                placesService.findPlaceFromQuery(fallbackRequest, (res, st) => {
+                  if (st === google.maps.places.PlacesServiceStatus.OK && res?.[0]?.geometry) {
+                    resolve({ location: res[0].geometry.location, place });
+                  } else {
+                    resolve(null);
+                  }
+                });
+              }
+            });
+          });
+        });
 
-                   const infoWindow = new google.maps.InfoWindow({
-                     content: `<div class="p-2 max-w-xs text-black"><b>Day ${day.day}: ${place.name}</b><br/>${place.time} - ${place.duration}<br/><i class="text-xs text-gray-500">${place.description}</i></div>`
-                   });
-                   marker.addListener('click', () => {
-                     infoWindow.open({ anchor: marker, map });
-                   });
-               }
-           });
-           
-           if (dayCoordinates.length > 1) {
-              const polyline = new google.maps.Polyline({
-                 path: dayCoordinates,
-                 geodesic: true,
-                 strokeColor: color,
-                 strokeOpacity: 0.8,
-                 strokeWeight: 3,
-                 map: map
-              });
-              newPolylines.push(polyline);
-           }
-       }
-       
-       if (newMarkers.length > 0) {
-           map.fitBounds(bounds);
-           if (map.getZoom() > 14) map.setZoom(14);
-       }
-       setMarkers(newMarkers);
-       setPolylines(newPolylines);
+        const resolvedLocations = await Promise.all(locationPromises);
+        const dayCoordinates = [];
+
+        resolvedLocations.forEach(result => {
+          if (result) {
+            const { location, place } = result;
+            dayCoordinates.push(location);
+            bounds.extend(location);
+
+            const marker = new google.maps.Marker({
+              map,
+              position: location,
+              title: place.name,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 7,
+                fillColor: color,
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+              }
+            });
+            newMarkers.push(marker);
+
+            const infoWindow = new google.maps.InfoWindow({
+              content: `<div class="p-2 max-w-xs text-black"><b>Day ${day.day}: ${place.name}</b><br/>${place.time} - ${place.duration}<br/><i class="text-xs text-gray-500">${place.description}</i></div>`
+            });
+            marker.addListener('click', () => {
+              infoWindow.open({ anchor: marker, map });
+            });
+          }
+        });
+
+        if (dayCoordinates.length > 1) {
+          const polyline = new google.maps.Polyline({
+            path: dayCoordinates,
+            geodesic: true,
+            strokeColor: color,
+            strokeOpacity: 0.8,
+            strokeWeight: 3,
+            map: map
+          });
+          newPolylines.push(polyline);
+        }
+      }
+
+      if (newMarkers.length > 0) {
+        map.fitBounds(bounds);
+        if (map.getZoom() > 14) map.setZoom(14);
+      }
+      setMarkers(newMarkers);
+      setPolylines(newPolylines);
     };
 
     processPlaces();
 
-  }, [itinerary, map, placesService]);
+    // Cleanup: remove overlays when itinerary changes or component unmounts
+    return () => {
+      newMarkers.forEach(m => m.setMap(null));
+      newPolylines.forEach(p => p.setMap(null));
+    };
+  }, [itinerary, map, placesService]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <article className="w-full h-full relative bg-gray-50" aria-label="Interactive Map Display">
@@ -155,10 +168,14 @@ export default function MapPanel({ itinerary }) {
            </div>
          </div>
        )}
-       {/* Ensure the map container is keyboard accessible and read appropriately by screen readers */}
-       <figure aria-label="Google Maps plotting your itinerary" role="application" className="w-full h-full">
-         <div ref={mapRef} className="w-full h-full" tabIndex={0} />
-       </figure>
+       {/* role="application" is appropriate for interactive widgets like maps */}
+       <div
+         role="application"
+         aria-label="Google Maps plotting your itinerary"
+         className="w-full h-full"
+       >
+         <div ref={mapRef} className="w-full h-full" tabIndex={0} aria-label="Map canvas" />
+       </div>
     </article>
   );
 }

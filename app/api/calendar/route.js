@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 /**
  * Handle POST request to add itinerary to Google Calendar.
  */
 export async function POST(req) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session || !session.accessToken) {
        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -66,6 +67,7 @@ export async function POST(req) {
            summary: `Andaman Trip: Day ${day.day} - ${day.title}`,
            location: `${day.location}, Andaman and Nicobar Islands`,
            description: description,
+           colorId: String((day.day % 11) + 1), // Cycle through Google Calendar's 11 color IDs
            start: {
              date: dateStr,
              timeZone: "Asia/Kolkata",

@@ -28,14 +28,38 @@ export async function POST(req) {
     });
 
     const result = await chat.sendMessage(message);
-    const responseText = result.response.text();
+    let responseText = result.response.text();
     
     let jsonResponse;
     try {
-      jsonResponse = JSON.parse(responseText);
+      // 1. Try to find JSON inside markdown blocks
+      let cleanText = responseText.trim();
+      const jsonMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      
+      if (jsonMatch) {
+        cleanText = jsonMatch[1].trim();
+      } else {
+        // 2. Fallback: find the first { and last }
+        const firstBrace = cleanText.indexOf('{');
+        const lastBrace = cleanText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+          cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+        }
+      }
+      
+      jsonResponse = JSON.parse(cleanText);
+      
+      // Basic validation
+      if (!jsonResponse.summary || !Array.isArray(jsonResponse.days)) {
+        throw new Error("Missing required fields in AI response");
+      }
     } catch (e) {
-      console.error("Failed to parse Gemini response as JSON", responseText);
-       return NextResponse.json({ error: "The AI response was not in the expected format. Please try again." }, { status: 500 });
+      console.error("Gemini Parsing/Validation Error:", e);
+      console.error("Raw Response Text that failed parsing:", responseText);
+       return NextResponse.json({ 
+         error: "The AI response was not in the expected format. Please try again.",
+         details: process.env.NODE_ENV === 'development' ? responseText : undefined
+       }, { status: 500 });
     }
 
     return NextResponse.json(jsonResponse);

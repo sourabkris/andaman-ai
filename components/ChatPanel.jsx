@@ -105,7 +105,7 @@ export default function ChatPanel({ onItineraryUpdate }) {
       <div className="p-4 bg-gray-50 border-t border-gray-200">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input 
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 text-black placeholder-gray-400 bg-white"
+            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-base md:text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 text-black placeholder-gray-400 bg-white"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="e.g. 5 days, couple, 30k budget..."

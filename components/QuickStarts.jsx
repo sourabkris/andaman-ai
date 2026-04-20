@@ -12,7 +12,7 @@ export default function QuickStarts({ onSelect }) {
         <button
           key={i}
           onClick={() => onSelect(t)}
-          className="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-full border border-gray-200 shadow-sm transition-colors cursor-pointer"
+          className="text-sm bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 md:px-4 md:py-2 rounded-full border border-gray-200 shadow-sm transition-all hover:shadow-md cursor-pointer active:scale-95"
         >
           {t}
         </button>

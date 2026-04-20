@@ -137,8 +137,8 @@ export default function MapPanel({ itinerary }) {
   return (
     <div className="w-full h-full relative bg-gray-50">
        {!itinerary && (
-         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm">
-           <div className="text-center p-6 bg-white rounded-xl shadow-lg border border-gray-100 max-w-sm">
+         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm p-4">
+           <div className="text-center p-5 md:p-6 bg-white rounded-xl shadow-lg border border-gray-100 max-w-sm w-full mx-auto">
              <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657h.01M21 12c0 4.97-8 12-8 12s-8-7.03-8-12a8 8 0 1116 0z" />

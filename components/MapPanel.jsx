@@ -55,23 +55,23 @@ export default function MapPanel({ itinerary }) {
     const processPlaces = async () => {
        for (const [dayIndex, day] of itinerary.days.entries()) {
            const color = colors[dayIndex % colors.length];
-           const dayCoordinates = [];
-
-           for (const place of day.places) {
+           
+           // EFFICIENCY: Process all places in the current day in parallel instead of sequentially
+           const locationPromises = day.places.map(place => {
                const request = {
                  query: `${place.name}, ${day.location}, Andaman and Nicobar Islands`,
                  fields: ['name', 'geometry'],
                };
                
-               const geocode = () => new Promise((resolve) => {
+               return new Promise((resolve) => {
                   placesService.findPlaceFromQuery(request, (results, status) => {
-                     if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0].geometry) {
-                         resolve(results[0].geometry.location);
+                     if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]?.geometry) {
+                         resolve({ location: results[0].geometry.location, place });
                      } else {
                          const fallbackRequest = { query: `${place.name}, Andaman`, fields: ['geometry'] };
                          placesService.findPlaceFromQuery(fallbackRequest, (res, st) => {
-                             if (st === google.maps.places.PlacesServiceStatus.OK && res && res[0].geometry) {
-                                 resolve(res[0].geometry.location);
+                             if (st === google.maps.places.PlacesServiceStatus.OK && res?.[0]?.geometry) {
+                                 resolve({ location: res[0].geometry.location, place });
                              } else {
                                  resolve(null);
                              }
@@ -79,9 +79,14 @@ export default function MapPanel({ itinerary }) {
                      }
                   });
                });
+           });
 
-               const location = await geocode();
-               if (location) {
+           const resolvedLocations = await Promise.all(locationPromises);
+           const dayCoordinates = [];
+
+           resolvedLocations.forEach(result => {
+               if (result) {
+                   const { location, place } = result;
                    dayCoordinates.push(location);
                    bounds.extend(location);
                    
@@ -107,7 +112,7 @@ export default function MapPanel({ itinerary }) {
                      infoWindow.open({ anchor: marker, map });
                    });
                }
-           }
+           });
            
            if (dayCoordinates.length > 1) {
               const polyline = new google.maps.Polyline({
@@ -135,12 +140,12 @@ export default function MapPanel({ itinerary }) {
   }, [itinerary, map, placesService]);
 
   return (
-    <div className="w-full h-full relative bg-gray-50">
+    <article className="w-full h-full relative bg-gray-50" aria-label="Interactive Map Display">
        {!itinerary && (
          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm p-4">
-           <div className="text-center p-5 md:p-6 bg-white rounded-xl shadow-lg border border-gray-100 max-w-sm w-full mx-auto">
+           <div className="text-center p-5 md:p-6 bg-white rounded-xl shadow-lg border border-gray-100 max-w-sm w-full mx-auto" aria-live="polite">
              <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657h.01M21 12c0 4.97-8 12-8 12s-8-7.03-8-12a8 8 0 1116 0z" />
                   <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -150,7 +155,10 @@ export default function MapPanel({ itinerary }) {
            </div>
          </div>
        )}
-       <div ref={mapRef} className="w-full h-full" />
-    </div>
+       {/* Ensure the map container is keyboard accessible and read appropriately by screen readers */}
+       <figure aria-label="Google Maps plotting your itinerary" role="application" className="w-full h-full">
+         <div ref={mapRef} className="w-full h-full" tabIndex={0} />
+       </figure>
+    </article>
   );
 }
